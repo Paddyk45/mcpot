@@ -1,5 +1,4 @@
 use std::env;
-use std::io::Read;
 
 use azalea_protocol::connect::Connection;
 use azalea_protocol::packets::ConnectionProtocol;

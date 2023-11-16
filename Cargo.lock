@@ -1316,7 +1316,6 @@ dependencies = [
 name = "mcpot"
 version = "0.1.0"
 dependencies = [
- "azalea-chat",
  "azalea-protocol",
  "color-eyre",
  "lazy_static",
