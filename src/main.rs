@@ -120,12 +120,8 @@ async fn main() {
     // Probably not the right way
     tokio::spawn(async move {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
-        select! {
-         _ = sigterm.recv() => {
-                println!("Received SIGTERM, exiting...");
-                exit(0)
-            }
-    }
+        sigterm.recv().await;
+        exit(0);
     });
 
     println!("Listening on :{}", CONFIG.bind.port);
