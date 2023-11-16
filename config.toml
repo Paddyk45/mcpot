@@ -3,6 +3,7 @@ addr = "0.0.0.0"
 port = 25565
 
 [server]
+disconnect_message = "Get baited!"
 description = "GeorgeNotFound private recording server"
 online_players = 1
 max_players = 20

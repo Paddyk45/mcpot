@@ -8,6 +8,7 @@ pub struct ConfigBind {
 
 #[derive(Deserialize, Clone)]
 pub struct ConfigServer {
+    pub disconnect_message: String,
     pub description: String,
     pub online_players: i32,
     pub max_players: i32

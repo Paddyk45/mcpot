@@ -102,7 +102,7 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
             }
 
             connection.write(ClientboundLoginDisconnectPacket {
-                reason: "You suc".into(),
+                reason: CONFIG.clone().server.disconnect_message.into(),
             }.get()).await?;
         }
 
