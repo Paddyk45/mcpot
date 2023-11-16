@@ -1,4 +1,5 @@
 use std::env;
+use std::process::exit;
 
 use azalea_protocol::connect::Connection;
 use azalea_protocol::packets::ConnectionProtocol;
@@ -10,11 +11,12 @@ use azalea_protocol::packets::status::clientbound_status_response_packet::{Clien
 use azalea_protocol::packets::status::ServerboundStatusPacket;
 use lazy_static::lazy_static;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::select;
+use tokio::signal::unix::{signal, SignalKind};
 
 use crate::config::Config;
 
 mod config;
-mod util;
 
 lazy_static! {
     static ref CONFIG: Config = Config::read( env::var("MCPOT_CONFIG_PATH").unwrap_or_else(|_| "./config.toml".to_string()) ).expect("Failed to read config");
@@ -114,6 +116,18 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
 #[tokio::main]
 async fn main() {
     color_eyre::install().unwrap();
+
+    // Probably not the right way
+    tokio::spawn(async move {
+        let mut sigterm = signal(SignalKind::terminate()).unwrap();
+        select! {
+         _ = sigterm.recv() => {
+                println!("Received SIGTERM, exiting...");
+                exit(0)
+            }
+    }
+    });
+
     println!("Listening on :{}", CONFIG.bind.port);
     listener(CONFIG.bind.addr.clone(), CONFIG.bind.port).await;
 }
