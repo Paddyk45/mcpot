@@ -12,6 +12,8 @@ tokio = { version = "1.34.0", default-features = false, features = ["time", "mac
 toml = "0.8.8"
 lazy_static = "1.4.0"
 serde = "1.0.192"
+serenity = { version = "0.11.7", default-features = false, features = ["model", "rustls_backend"] }
+tracing = "0.1.40"
 
 [profile.release]
 opt-level = 'z'

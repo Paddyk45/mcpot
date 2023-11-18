@@ -5,9 +5,13 @@ port = 25565
 [server]
 disconnect_message = "Get baited!"
 description = "GeorgeNotFound private recording server"
-online_players = 1
+online_players = 2
 max_players = 20
 
 [[player]]
 name = "GeorgeNotFound"
 uuid = "bd3dd5a4-0438-4699-b2fd-36f518154b41"
+
+[[player]]
+name = "Dream"
+uuid = "ec70bcaf-702f-4bb8-b48d-276fa52a780c"
