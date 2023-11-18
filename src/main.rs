@@ -19,6 +19,7 @@ use lazy_static::lazy_static;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::{error, info};
+use tracing::Level;
 
 use crate::config::Config;
 
@@ -132,7 +133,10 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
 #[tokio::main]
 async fn main() {
     color_eyre::install().unwrap();
-
+    tracing_subscriber::fmt()
+        .compact()
+        .with_max_level(Level::INFO)
+        .init();
     // Probably not the right way
     tokio::spawn(async move {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
