@@ -22,6 +22,7 @@ pub struct ConfigPlayer {
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
+    pub webhook_url: Option<String>,
     pub bind: ConfigBind,
     pub server: ConfigServer,
     pub player: Option<Vec<ConfigPlayer>>,
