@@ -4,6 +4,7 @@ use std::env;
 use std::process::exit;
 
 use azalea_protocol::connect::Connection;
+use azalea_protocol::packets::ConnectionProtocol;
 use azalea_protocol::packets::handshaking::{
     ClientboundHandshakePacket, ServerboundHandshakePacket,
 };
@@ -14,16 +15,16 @@ use azalea_protocol::packets::status::clientbound_status_response_packet::{
     ClientboundStatusResponsePacket, Players, SamplePlayer, Version,
 };
 use azalea_protocol::packets::status::ServerboundStatusPacket;
-use azalea_protocol::packets::ConnectionProtocol;
 use lazy_static::lazy_static;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
-use tracing::{error, info};
-use tracing::Level;
 
 use crate::config::Config;
+use crate::log::{log_info, log_info_webhook};
 
 mod config;
+mod log;
+mod webhook;
 
 lazy_static! {
     static ref CONFIG: Config =
@@ -38,11 +39,11 @@ async fn listener(addr: String, port: u16) {
     loop {
         match listener.accept().await {
             Ok((conn, addr)) => {
-                info!("Opening connection to {addr}");
+                format!("Opening connection to {addr}");
                 tokio::spawn(async { handler(conn).await });
             }
             Err(why) => {
-                error!("I/O Error while accepting client: {why}");
+                eprintln!("I/O Error while accepting client: {why}");
             }
         }
     }
@@ -55,10 +56,13 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
         Connection::wrap(stream);
     let ServerboundHandshakePacket::ClientIntention(handshake) =
         connection.read().await.expect("Failed to read packet");
-    info!(
+    log_info(format!(
         "Handshake from {peer_addr} -> {}:{}, version={}, intention={:?}",
-        handshake.hostname, handshake.port, handshake.protocol_version, handshake.intention
-    );
+        handshake.hostname,
+        handshake.port,
+        handshake.protocol_version,
+        handshake.intention
+    ));
 
     match handshake.intention {
         ConnectionProtocol::Status => {
@@ -66,7 +70,7 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
             while let Ok(packet) = connection.read().await {
                 match packet {
                     ServerboundStatusPacket::StatusRequest(_) => {
-                        info!("Got status request from {peer_addr}");
+                        log_info_webhook(format!("Got status request from {peer_addr}"));
                         let mut sample = vec![];
                         for player in CONFIG.clone().player.unwrap_or_default() {
                             sample.push(SamplePlayer {
@@ -96,7 +100,7 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
                     }
 
                     ServerboundStatusPacket::PingRequest(pr) => {
-                        info!("Got ping request from {peer_addr}",);
+                        log_info_webhook(format!("Got ping request from {peer_addr}"));
                         connection
                             .write(ClientboundPongResponsePacket { time: pr.time }.get())
                             .await?;
@@ -109,10 +113,11 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
             let mut connection = connection.login();
             let packet = connection.read().await?;
             if let ServerboundLoginPacket::Hello(hi) = packet {
-                info!(
+                log_info_webhook(format!(
                     "Got login from {peer_addr}, name={}, uuid={:?}",
-                    hi.name, hi.profile_id
-                );
+                    hi.name,
+                    hi.profile_id
+                ));
             }
 
             connection
@@ -133,10 +138,6 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
 #[tokio::main]
 async fn main() {
     color_eyre::install().unwrap();
-    tracing_subscriber::fmt()
-        .compact()
-        .with_max_level(Level::INFO)
-        .init();
     // Probably not the right way
     tokio::spawn(async move {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
