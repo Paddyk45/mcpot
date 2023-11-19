@@ -39,7 +39,7 @@ async fn listener(addr: String, port: u16) {
     loop {
         match listener.accept().await {
             Ok((conn, addr)) => {
-                format!("Opening connection to {addr}");
+                log_info(format!("Opening connection to {addr}"));
                 tokio::spawn(async { handler(conn).await });
             }
             Err(why) => {
