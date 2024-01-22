@@ -28,10 +28,19 @@ pub struct ConfigWebhook {
 }
 
 #[derive(Deserialize, Clone)]
+pub struct ConfigRandomize {
+    pub randomize_players: bool,
+    pub randomize_players_name_len: usize,
+    pub randomize_players_len: usize,
+    pub randomize_online_max: bool,
+}
+
+#[derive(Deserialize, Clone)]
 pub struct Config {
     pub bind: ConfigBind,
     pub server: ConfigServer,
     pub webhook: ConfigWebhook,
+    pub randomize: ConfigRandomize,
     pub player: Option<Vec<ConfigPlayer>>,
 }
 

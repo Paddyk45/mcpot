@@ -18,6 +18,7 @@ use azalea_protocol::packets::status::ServerboundStatusPacket;
 use lazy_static::lazy_static;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
+use uuid::Uuid;
 
 use crate::config::Config;
 use crate::log::{log_info, log_info_webhook, log_webhook};
@@ -75,14 +76,28 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
                                 name: player.name,
                             });
                         }
+                        if CONFIG.randomize.randomize_players {
+                            for _ in 0..CONFIG.randomize.randomize_players_len {
+                                sample.push(SamplePlayer {
+                                    id: Uuid::new_v4().to_string(),
+                                    name: random_string::generate(CONFIG.randomize.randomize_players_name_len, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_")
+                                });
+                            }
+                        }
+
+                        let (online, max) = match CONFIG.randomize.randomize_online_max {
+                            true => (fastrand::i32(..), fastrand::i32(..)),
+                            false => (CONFIG.server.max_players, CONFIG.server.online_players)
+                        };
+
                         connection
                             .write(
                                 ClientboundStatusResponsePacket {
                                     description: CONFIG.server.description.clone().into(),
                                     favicon: None,
                                     players: Players {
-                                        max: CONFIG.server.max_players,
-                                        online: CONFIG.server.online_players,
+                                        max,
+                                        online,
                                         sample,
                                     },
                                     version: Version {

@@ -15,6 +15,9 @@ serde = "1.0.192"
 ureq = { version = "2.8.0", features = ["json"] }
 strip-ansi-escapes = "0.2.0"
 dotenvy = "0.15.7"
+random-string = "1.1.0"
+uuid = { version = "1.5.0", features = ["v4"] }
+fastrand = "2.0.1"
 
 [profile.release]
 opt-level = 'z'
