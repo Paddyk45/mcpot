@@ -20,7 +20,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
 
 use crate::config::Config;
-use crate::log::{log_info, log_info_webhook};
+use crate::log::{log_info, log_info_webhook, log_webhook};
 
 mod config;
 mod log;
@@ -58,10 +58,7 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
         connection.read().await.expect("Failed to read packet");
     log_info(format!(
         "Handshake from {peer_addr} -> {}:{}, version={}, intention={:?}",
-        handshake.hostname,
-        handshake.port,
-        handshake.protocol_version,
-        handshake.intention
+        handshake.hostname, handshake.port, handshake.protocol_version, handshake.intention
     ));
 
     match handshake.intention {
@@ -100,7 +97,16 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
                     }
 
                     ServerboundStatusPacket::PingRequest(pr) => {
-                        log_info_webhook(format!("Got ping request from {peer_addr}"));
+                        match CONFIG.webhook.show_host_port {
+                            true => {
+                                log_info(format!("Got ping request from {peer_addr}"));
+                                log_webhook(format!(
+                                    "Got ping request from {peer_addr}, handshake_host={}, handshake_port={}",
+                                    handshake.hostname, handshake.port
+                                ));
+                            }
+                            false => log_info_webhook(format!("Got ping request from {peer_addr}")),
+                        }
                         connection
                             .write(ClientboundPongResponsePacket { time: pr.time }.get())
                             .await?;
@@ -113,11 +119,19 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
             let mut connection = connection.login();
             let packet = connection.read().await?;
             if let ServerboundLoginPacket::Hello(hi) = packet {
-                log_info_webhook(format!(
-                    "Got login from {peer_addr}, name={}, uuid={:?}",
-                    hi.name,
-                    hi.profile_id
-                ));
+                match CONFIG.webhook.show_host_port {
+                    true => {
+                        log_info(format!(
+                            "Got login from {peer_addr}, name={}, uuid={}",
+                            hi.name, hi.profile_id
+                        ));
+                        log_webhook(format!(
+                            "Got login from {peer_addr}, name={}, uuid={}, handshake_host={}, handshake_port={}",
+                            hi.name, hi.profile_id, handshake.hostname, handshake.port
+                        ));
+                    }
+                    false => log_info_webhook(format!("Got login from {peer_addr}")),
+                }
             }
 
             connection
