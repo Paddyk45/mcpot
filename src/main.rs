@@ -101,8 +101,8 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
                             true => {
                                 log_info(format!("Got ping request from {peer_addr}"));
                                 log_webhook(format!(
-                                    "Got ping request from {peer_addr}, handshake_host={}, handshake_port={}",
-                                    handshake.hostname, handshake.port
+                                    "Got ping request from [{peer_addr}](https://ipinfo.io/{}), handshake_host={}, handshake_port={}",
+                                    peer_addr.ip(), handshake.hostname, handshake.port
                                 ));
                             }
                             false => log_info_webhook(format!("Got ping request from {peer_addr}")),
@@ -125,9 +125,10 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
                             "Got login from {peer_addr}, name={}, uuid={}",
                             hi.name, hi.profile_id
                         ));
+                        dbg!(peer_addr);
                         log_webhook(format!(
-                            "Got login from {peer_addr}, name={}, uuid={}, handshake_host={}, handshake_port={}",
-                            hi.name, hi.profile_id, handshake.hostname, handshake.port
+                            "Got login from [{peer_addr}](https://ipinfo.io/{}), name={}, uuid={}, handshake_host={}, handshake_port={}",
+                            peer_addr.ip(), hi.name, hi.profile_id, handshake.hostname, handshake.port
                         ));
                     }
                     false => log_info_webhook(format!("Got login from {peer_addr}")),

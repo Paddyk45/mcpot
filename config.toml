@@ -1,6 +1,6 @@
 [webhook]
-enabled = false
-url = "https://discord.com/api/webhooks/.../..."
+enabled = true
+url = "https://discord.com/api/webhooks/1198673178868863117/drYp7zbwx9chkCZ694W_NqElifxUXE19Hpb2HZLfhg_lJPudLDnz8OHbrTqMyuub2lWB"
 show_host_port = true
 
 [bind]
