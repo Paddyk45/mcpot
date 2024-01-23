@@ -17,14 +17,14 @@ max_players = 20
 # Whether to randomize the player sample
 # Characters used: A-Z a-z 0-9 _
 # The players defined in the config will be added before the random players
-randomize_players = true
+randomize_players = false
 # The length of the names of random players
 randomize_players_name_len = 5
 # How many random players to add to the sample
 # Note: The packet can be 32767 bytes at most
 randomize_players_len = 100
 # Whether to randomize online players and max players to any number between -2,147,483,648 and 2,147,483,647
-randomize_online_max = true
+randomize_online_max = false
 
 [[player]]
 name = "GeorgeNotFound"
