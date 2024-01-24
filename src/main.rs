@@ -18,6 +18,7 @@ use azalea_protocol::packets::status::ServerboundStatusPacket;
 use lazy_static::lazy_static;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::spawn;
 use uuid::Uuid;
 
 use crate::config::Config;
@@ -41,7 +42,7 @@ async fn listener(addr: String, port: u16) {
         match listener.accept().await {
             Ok((conn, addr)) => {
                 log_info(format!("Opening connection to {addr}"));
-                tokio::spawn(async { handler(conn).await });
+                tokio::spawn(async move { handler(conn, port).await });
             }
             Err(why) => {
                 eprintln!("I/O Error while accepting client: {why}");
@@ -50,7 +51,7 @@ async fn listener(addr: String, port: u16) {
     }
 }
 
-async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
+async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
     stream.set_nodelay(true).unwrap();
     let peer_addr = stream.peer_addr()?;
     let mut connection: Connection<ServerboundHandshakePacket, ClientboundHandshakePacket> =
@@ -58,7 +59,7 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
     let ServerboundHandshakePacket::ClientIntention(handshake) =
         connection.read().await.expect("Failed to read packet");
     log_info(format!(
-        "Handshake from {peer_addr} -> {}:{}, version={}, intention={:?}",
+        "Handshake on port {port} from {peer_addr} -> {}:{}, version={}, intention={:?}",
         handshake.hostname, handshake.port, handshake.protocol_version, handshake.intention
     ));
 
@@ -68,7 +69,16 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
             while let Ok(packet) = connection.read().await {
                 match packet {
                     ServerboundStatusPacket::StatusRequest(_) => {
-                        log_info_webhook(format!("Got status request from {peer_addr}"));
+                        match CONFIG.webhook.show_host_port {
+                            true => {
+                                log_info(format!("Got status request from {peer_addr}"));
+                                log_webhook(format!(
+                                    "Got status request from [{peer_addr}](https://ipinfo.io/{}) on port {port}, handshake_host={}, handshake_port={}",
+                                    peer_addr.ip(), handshake.hostname, handshake.port
+                                ));
+                            }
+                            false => log_info_webhook(format!("Got status request from {peer_addr}")),
+                        }
                         let mut sample = vec![];
                         for player in CONFIG.clone().player.unwrap_or_default() {
                             sample.push(SamplePlayer {
@@ -116,7 +126,7 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
                             true => {
                                 log_info(format!("Got ping request from {peer_addr}"));
                                 log_webhook(format!(
-                                    "Got ping request from [{peer_addr}](https://ipinfo.io/{}), handshake_host={}, handshake_port={}",
+                                    "Got ping request from [{peer_addr}](https://ipinfo.io/{}) on port {port}, handshake_host={}, handshake_port={}",
                                     peer_addr.ip(), handshake.hostname, handshake.port
                                 ));
                             }
@@ -140,9 +150,8 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
                             "Got login from {peer_addr}, name={}, uuid={}",
                             hi.name, hi.profile_id
                         ));
-                        dbg!(peer_addr);
                         log_webhook(format!(
-                            "Got login from [{peer_addr}](https://ipinfo.io/{}), name={}, uuid={}, handshake_host={}, handshake_port={}",
+                            "Got login from [{peer_addr}](https://ipinfo.io/{}) on port {port}, name={}, uuid={}, handshake_host={}, handshake_port={}",
                             peer_addr.ip(), hi.name, hi.profile_id, handshake.hostname, handshake.port
                         ));
                     }
@@ -169,12 +178,14 @@ async fn handler(stream: TcpStream) -> color_eyre::Result<()> {
 async fn main() {
     color_eyre::install().unwrap();
     // Probably not the right way
-    tokio::spawn(async move {
+    spawn(async move {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
         sigterm.recv().await;
         exit(0);
     });
-
-    println!("Listening on :{}", CONFIG.bind.port);
-    listener(CONFIG.bind.addr.clone(), CONFIG.bind.port).await;
+    println!("Listening on port(s) {}", CONFIG.bind.ports.iter().map(u16::to_string).collect::<Vec<String>>().join(", "));
+    for port in CONFIG.bind.ports.clone() {
+        spawn(listener(CONFIG.bind.addr.clone(), port));
+    }
+    loop {}
 }

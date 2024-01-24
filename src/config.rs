@@ -3,7 +3,7 @@ use serde::Deserialize;
 #[derive(Deserialize, Clone)]
 pub struct ConfigBind {
     pub addr: String,
-    pub port: u16,
+    pub ports: Vec<u16>,
 }
 
 #[derive(Deserialize, Clone)]
