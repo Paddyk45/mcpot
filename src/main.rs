@@ -202,8 +202,11 @@ async fn main() {
             .collect::<Vec<String>>()
             .join(", ")
     );
+    let mut handles = vec![];
     for port in CONFIG.bind.ports.clone() {
-        spawn(listener(CONFIG.bind.addr.clone(), port));
-    }
-    loop {}
+        handles.push(spawn(listener(CONFIG.bind.addr.clone(), port)));
+    };
+    for h in handles {
+        h.await.unwrap();
+    };
 }
