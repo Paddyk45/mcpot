@@ -22,7 +22,7 @@ use tokio::spawn;
 use uuid::Uuid;
 
 use crate::config::Config;
-use crate::log::{log_info, log_info_webhook, log_webhook};
+use crate::log::{log_info, log_webhook};
 
 mod config;
 mod log;
@@ -59,7 +59,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
     let ServerboundHandshakePacket::ClientIntention(handshake) =
         connection.read().await.expect("Failed to read packet");
     log_info(format!(
-        "Handshake on port {port} from {peer_addr} -> {}:{}, version={}, intention={:?}",
+        "[:{port}] Handshake from {peer_addr} -> {}:{}, version={}, intention={:?}",
         handshake.hostname, handshake.port, handshake.protocol_version, handshake.intention
     ));
 
@@ -69,15 +69,17 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
             while let Ok(packet) = connection.read().await {
                 match packet {
                     ServerboundStatusPacket::StatusRequest(_) => {
+                        log_info(format!("[:{port}] Got status request from {peer_addr}"));
                         match CONFIG.webhook.show_host_port {
                             true => {
-                                log_info(format!("Got status request from {peer_addr}"));
                                 log_webhook(format!(
-                                    "Got status request from [{peer_addr}](https://ipinfo.io/{}) on port {port}, handshake_host={}, handshake_port={}",
+                                    "Got status request from [{peer_addr}](<https://ipinfo.io/{}>) on port {port}, handshake_host={}, handshake_port={}",
                                     peer_addr.ip(), handshake.hostname, handshake.port
                                 ));
                             }
-                            false => log_info_webhook(format!("Got status request from {peer_addr}")),
+                            false => {
+                                log_webhook(format!("Got status request from [{peer_addr}](<https://ipinfo.io/{}>) on port {port}", peer_addr.ip()));
+                            }
                         }
                         let mut sample = vec![];
                         for player in CONFIG.clone().player.unwrap_or_default() {
@@ -97,7 +99,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
 
                         let (online, max) = match CONFIG.randomize.randomize_online_max {
                             true => (fastrand::i32(..), fastrand::i32(..)),
-                            false => (CONFIG.server.max_players, CONFIG.server.online_players)
+                            false => (CONFIG.server.max_players, CONFIG.server.online_players),
                         };
 
                         connection
@@ -122,15 +124,17 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
                     }
 
                     ServerboundStatusPacket::PingRequest(pr) => {
+                        log_info(format!("[:{port}] Got ping request from {peer_addr}"));
                         match CONFIG.webhook.show_host_port {
                             true => {
-                                log_info(format!("Got ping request from {peer_addr}"));
                                 log_webhook(format!(
-                                    "Got ping request from [{peer_addr}](https://ipinfo.io/{}) on port {port}, handshake_host={}, handshake_port={}",
+                                    "Got ping request from [{peer_addr}](<https://ipinfo.io/{}>) on port {port}, handshake_host={}, handshake_port={}",
                                     peer_addr.ip(), handshake.hostname, handshake.port
                                 ));
                             }
-                            false => log_info_webhook(format!("Got ping request from {peer_addr}")),
+                            false => {
+                                log_webhook(format!("Got ping request from [{peer_addr}](<https://ipinfo.io/{}>)", peer_addr.ip()));
+                            }
                         }
                         connection
                             .write(ClientboundPongResponsePacket { time: pr.time }.get())
@@ -144,18 +148,23 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
             let mut connection = connection.login();
             let packet = connection.read().await?;
             if let ServerboundLoginPacket::Hello(hi) = packet {
+                log_info(format!(
+                    "[:{port}] Got login request from {peer_addr}, name={}, uuid={}",
+                    hi.name, hi.profile_id
+                ));
                 match CONFIG.webhook.show_host_port {
                     true => {
-                        log_info(format!(
-                            "Got login from {peer_addr}, name={}, uuid={}",
-                            hi.name, hi.profile_id
-                        ));
                         log_webhook(format!(
-                            "Got login from [{peer_addr}](https://ipinfo.io/{}) on port {port}, name={}, uuid={}, handshake_host={}, handshake_port={}",
-                            peer_addr.ip(), hi.name, hi.profile_id, handshake.hostname, handshake.port
+                            "Got login from [{peer_addr}](<https://ipinfo.io/{}>) on port {port}, handshake_host={}, handshake_port={}, name={}, uuid={}",
+                            peer_addr.ip(), handshake.hostname, handshake.port,  hi.name, hi.profile_id
                         ));
                     }
-                    false => log_info_webhook(format!("Got login from {peer_addr}")),
+                    false => {
+                        log_webhook(format!(
+                            "Got login request from [{peer_addr}](<https://ipinfo.io/{}>), name={}, uuid={}",
+                            peer_addr.ip(), hi.name, hi.profile_id
+                        ));
+                    }
                 }
             }
 
@@ -183,7 +192,16 @@ async fn main() {
         sigterm.recv().await;
         exit(0);
     });
-    println!("Listening on port(s) {}", CONFIG.bind.ports.iter().map(u16::to_string).collect::<Vec<String>>().join(", "));
+    println!(
+        "Listening on port(s) {}",
+        CONFIG
+            .bind
+            .ports
+            .iter()
+            .map(u16::to_string)
+            .collect::<Vec<String>>()
+            .join(", ")
+    );
     for port in CONFIG.bind.ports.clone() {
         spawn(listener(CONFIG.bind.addr.clone(), port));
     }
