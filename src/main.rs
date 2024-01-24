@@ -78,7 +78,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
                                 ));
                             }
                             false => {
-                                log_webhook(format!("Got status request from [{peer_addr}](<https://ipinfo.io/{}>) on port {port}", peer_addr.ip()));
+                                log_webhook(format!("Got status request from [{peer_addr}](<https://ipinfo.io/{}>)", peer_addr.ip()));
                             }
                         }
                         let mut sample = vec![];
