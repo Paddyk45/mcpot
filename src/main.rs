@@ -4,7 +4,6 @@ use std::env;
 use std::process::exit;
 
 use azalea_protocol::connect::Connection;
-use azalea_protocol::packets::ConnectionProtocol;
 use azalea_protocol::packets::handshaking::{
     ClientboundHandshakePacket, ServerboundHandshakePacket,
 };
@@ -15,6 +14,7 @@ use azalea_protocol::packets::status::clientbound_status_response_packet::{
     ClientboundStatusResponsePacket, Players, SamplePlayer, Version,
 };
 use azalea_protocol::packets::status::ServerboundStatusPacket;
+use azalea_protocol::packets::ClientIntention;
 use lazy_static::lazy_static;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::signal::unix::{signal, SignalKind};
@@ -64,7 +64,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
     ));
 
     match handshake.intention {
-        ConnectionProtocol::Status => {
+        ClientIntention::Status => {
             let mut connection = connection.status();
             while let Ok(packet) = connection.read().await {
                 match packet {
@@ -144,7 +144,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
             }
         }
 
-        ConnectionProtocol::Login => {
+        ClientIntention::Login => {
             let mut connection = connection.login();
             let packet = connection.read().await?;
             if let ServerboundLoginPacket::Hello(hi) = packet {
