@@ -4,14 +4,14 @@ use std::env;
 use std::process::exit;
 
 use azalea_protocol::connect::Connection;
-use azalea_protocol::packets::handshaking::{
-    ClientboundHandshakePacket, ServerboundHandshakePacket,
+use azalea_protocol::packets::handshake::{
+    ClientboundHandshakePacket, ServerboundHandshakePacket
 };
-use azalea_protocol::packets::login::clientbound_login_disconnect_packet::ClientboundLoginDisconnectPacket;
+use azalea_protocol::packets::login::ClientboundLoginDisconnect;
 use azalea_protocol::packets::login::ServerboundLoginPacket;
-use azalea_protocol::packets::status::clientbound_pong_response_packet::ClientboundPongResponsePacket;
-use azalea_protocol::packets::status::clientbound_status_response_packet::{
-    ClientboundStatusResponsePacket, Players, SamplePlayer, Version,
+use azalea_protocol::packets::status::ClientboundPongResponse;
+use azalea_protocol::packets::status::c_status_response::{
+    ClientboundStatusResponse, Players, SamplePlayer, Version,
 };
 use azalea_protocol::packets::status::ServerboundStatusPacket;
 use azalea_protocol::packets::ClientIntention;
@@ -41,7 +41,7 @@ async fn listener(addr: String, port: u16) {
     loop {
         match listener.accept().await {
             Ok((conn, addr)) => {
-                log_info(format!("Opening connection to {addr}"));
+                log_info(format!("[:{port}] Opening connection to {addr}"));
                 tokio::spawn(async move { handler(conn, port).await });
             }
             Err(why) => {
@@ -56,7 +56,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
     let peer_addr = stream.peer_addr()?;
     let mut connection: Connection<ServerboundHandshakePacket, ClientboundHandshakePacket> =
         Connection::wrap(stream);
-    let ServerboundHandshakePacket::ClientIntention(handshake) =
+    let ServerboundHandshakePacket::Intention(handshake) =
         connection.read().await.expect("Failed to read packet");
     log_info(format!(
         "[:{port}] Handshake from {peer_addr} -> {}:{}, version={}, intention={:?}",
@@ -104,7 +104,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
 
                         connection
                             .write(
-                                ClientboundStatusResponsePacket {
+                                ClientboundStatusResponse {
                                     description: CONFIG.server.description.clone().into(),
                                     favicon: None,
                                     players: Players {
@@ -118,7 +118,6 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
                                     },
                                     enforces_secure_chat: None,
                                 }
-                                .get(),
                             )
                             .await?;
                     }
@@ -137,7 +136,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
                             }
                         }
                         connection
-                            .write(ClientboundPongResponsePacket { time: pr.time }.get())
+                            .write(ClientboundPongResponse { time: pr.time })
                             .await?;
                     }
                 }
@@ -170,10 +169,9 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
 
             connection
                 .write(
-                    ClientboundLoginDisconnectPacket {
+                    ClientboundLoginDisconnect {
                         reason: CONFIG.clone().server.disconnect_message.into(),
                     }
-                    .get(),
                 )
                 .await?;
         }
@@ -193,17 +191,10 @@ async fn main() {
         exit(0);
     });
     println!(
-        "Listening on port(s) {}",
-        CONFIG
-            .bind
-            .ports
-            .iter()
-            .map(u16::to_string)
-            .collect::<Vec<String>>()
-            .join(", ")
+        "Listening on port(s) arp",
     );
     let mut handles = vec![];
-    for port in CONFIG.bind.ports.clone() {
+    for port in CONFIG.bind.ports_start..CONFIG.bind.ports_end {
         handles.push(spawn(listener(CONFIG.bind.addr.clone(), port)));
     };
     for h in handles {
