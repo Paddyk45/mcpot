@@ -3,7 +3,7 @@ use strip_ansi_escapes::strip_str;
 use crate::webhook;
 
 pub fn log_info(msg: impl ToString) {
-    println!("{}", strip_str(msg.to_string()));
+    println!("{}", strip_str(msg.to_string()).replace('\n', "\\n"));
 }
 
 pub fn log_info_webhook(msg: impl ToString) {
