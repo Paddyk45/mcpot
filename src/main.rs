@@ -190,11 +190,11 @@ async fn main() {
         sigterm.recv().await;
         exit(0);
     });
-    println!(
-        "Listening on port(s) arp",
-    );
+
+    let ports = CONFIG.util_ports_as_vec().expect("failed to parse ports");
+    println!("Listening on port(s) {ports:?}");
     let mut handles = vec![];
-    for port in CONFIG.bind.ports_start..CONFIG.bind.ports_end {
+    for port in ports {
         handles.push(spawn(listener(CONFIG.bind.addr.clone(), port)));
     };
     for h in handles {

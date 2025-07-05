@@ -21,3 +21,6 @@ fastrand = "2.0.1"
 
 [profile.release]
 opt-level = 'z'
+
+[patch.crates-io]
+pkcs1 = { git = "https://github.com/RustCrypto/formats"}

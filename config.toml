@@ -5,7 +5,8 @@ show_host_port = true
 
 [bind]
 addr = "0.0.0.0"
-ports = [25565, 25566]
+ports = "25565"
+# ports = "25565,25569,40000-41000"
 
 [server]
 disconnect_message = "Get baited!"
