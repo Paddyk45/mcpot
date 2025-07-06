@@ -1,9 +1,16 @@
+use std::time::SystemTime;
+
 use strip_ansi_escapes::strip_str;
 
 use crate::webhook;
 
 pub fn log_info(msg: impl ToString) {
-    println!("{}", strip_str(msg.to_string()).replace('\n', "\\n"));
+    let time = SystemTime::now();
+    let time_hr = humantime::format_rfc3339(time).to_string();
+    println!(
+        "{time_hr} | {}",
+        strip_str(msg.to_string()).replace('\n', "\\n")
+    );
 }
 
 pub fn log_info_webhook(msg: impl ToString) {

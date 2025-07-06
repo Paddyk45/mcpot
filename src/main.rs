@@ -1,18 +1,17 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
 use std::env;
+use std::os::fd::AsRawFd;
 use std::process::exit;
 
 use azalea_protocol::connect::Connection;
-use azalea_protocol::packets::handshake::{
-    ClientboundHandshakePacket, ServerboundHandshakePacket
-};
+use azalea_protocol::packets::handshake::{ClientboundHandshakePacket, ServerboundHandshakePacket};
 use azalea_protocol::packets::login::ClientboundLoginDisconnect;
 use azalea_protocol::packets::login::ServerboundLoginPacket;
-use azalea_protocol::packets::status::ClientboundPongResponse;
 use azalea_protocol::packets::status::c_status_response::{
     ClientboundStatusResponse, Players, SamplePlayer, Version,
 };
+use azalea_protocol::packets::status::ClientboundPongResponse;
 use azalea_protocol::packets::status::ServerboundStatusPacket;
 use azalea_protocol::packets::ClientIntention;
 use lazy_static::lazy_static;
@@ -38,11 +37,21 @@ async fn listener(addr: String, port: u16) {
     let listener = TcpListener::bind((addr, port))
         .await
         .expect("Failed to start the listener");
+    let mut counter: usize = 0;
     loop {
         match listener.accept().await {
             Ok((conn, addr)) => {
-                log_info(format!("[:{port}] Opening connection to {addr}"));
-                tokio::spawn(async move { handler(conn, port).await });
+                log_info(format!(
+                    "[:{port} ({counter})] Opening connection to {addr}"
+                ));
+                tokio::spawn(async move {
+                    tokio::time::timeout(
+                        std::time::Duration::from_secs(60),
+                        handler(conn, port, counter),
+                    )
+                    .await
+                });
+                counter += 1;
             }
             Err(why) => {
                 eprintln!("I/O Error while accepting client: {why}");
@@ -51,16 +60,18 @@ async fn listener(addr: String, port: u16) {
     }
 }
 
-async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
+async fn handler(stream: TcpStream, port: u16, id: usize) -> eyre::Result<()> {
     stream.set_nodelay(true).unwrap();
     let peer_addr = stream.peer_addr()?;
     let mut connection: Connection<ServerboundHandshakePacket, ClientboundHandshakePacket> =
         Connection::wrap(stream);
-    let ServerboundHandshakePacket::Intention(handshake) =
-        connection.read().await.expect("Failed to read packet");
+    let ServerboundHandshakePacket::Intention(handshake) = connection.read().await?;
     log_info(format!(
-        "[:{port}] Handshake from {peer_addr} -> {}:{}, version={}, intention={:?}",
-        handshake.hostname, handshake.port, handshake.protocol_version, handshake.intention
+        "[:{port} ({id})] Handshake from {peer_addr} -> `{}`:{}, version={}, intention={:?}",
+        handshake.hostname.replace("`", "'"),
+        handshake.port,
+        handshake.protocol_version,
+        handshake.intention
     ));
 
     match handshake.intention {
@@ -69,7 +80,9 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
             while let Ok(packet) = connection.read().await {
                 match packet {
                     ServerboundStatusPacket::StatusRequest(_) => {
-                        log_info(format!("[:{port}] Got status request from {peer_addr}"));
+                        log_info(format!(
+                            "[:{port} ({id})] Got status request from {peer_addr}"
+                        ));
                         match CONFIG.webhook.show_host_port {
                             true => {
                                 log_webhook(format!(
@@ -78,7 +91,10 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
                                 ));
                             }
                             false => {
-                                log_webhook(format!("Got status request from [{peer_addr}](<https://ipinfo.io/{}>)", peer_addr.ip()));
+                                log_webhook(format!(
+                                    "Got status request from [{peer_addr}](<https://ipinfo.io/{}>)",
+                                    peer_addr.ip()
+                                ));
                             }
                         }
                         let mut sample = vec![];
@@ -103,27 +119,27 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
                         };
 
                         connection
-                            .write(
-                                ClientboundStatusResponse {
-                                    description: CONFIG.server.description.clone().into(),
-                                    favicon: None,
-                                    players: Players {
-                                        max,
-                                        online,
-                                        sample,
-                                    },
-                                    version: Version {
-                                        name: "Paper 1.20.2".to_string(),
-                                        protocol: 764,
-                                    },
-                                    enforces_secure_chat: None,
-                                }
-                            )
+                            .write(ClientboundStatusResponse {
+                                description: CONFIG.server.description.clone().into(),
+                                favicon: None,
+                                players: Players {
+                                    max,
+                                    online,
+                                    sample,
+                                },
+                                version: Version {
+                                    name: "Paper 1.20.2".to_string(),
+                                    protocol: 764,
+                                },
+                                enforces_secure_chat: None,
+                            })
                             .await?;
                     }
 
                     ServerboundStatusPacket::PingRequest(pr) => {
-                        log_info(format!("[:{port}] Got ping request from {peer_addr}"));
+                        log_info(format!(
+                            "[:{port} ({id})] Got ping request from {peer_addr}"
+                        ));
                         match CONFIG.webhook.show_host_port {
                             true => {
                                 log_webhook(format!(
@@ -132,7 +148,10 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
                                 ));
                             }
                             false => {
-                                log_webhook(format!("Got ping request from [{peer_addr}](<https://ipinfo.io/{}>)", peer_addr.ip()));
+                                log_webhook(format!(
+                                    "Got ping request from [{peer_addr}](<https://ipinfo.io/{}>)",
+                                    peer_addr.ip()
+                                ));
                             }
                         }
                         connection
@@ -148,7 +167,7 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
             let packet = connection.read().await?;
             if let ServerboundLoginPacket::Hello(hi) = packet {
                 log_info(format!(
-                    "[:{port}] Got login request from {peer_addr}, name={}, uuid={}",
+                    "[:{port} ({id})] Got login request from {peer_addr}, name={}, uuid={}",
                     hi.name, hi.profile_id
                 ));
                 match CONFIG.webhook.show_host_port {
@@ -168,11 +187,9 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
             }
 
             connection
-                .write(
-                    ClientboundLoginDisconnect {
-                        reason: CONFIG.clone().server.disconnect_message.into(),
-                    }
-                )
+                .write(ClientboundLoginDisconnect {
+                    reason: CONFIG.clone().server.disconnect_message.into(),
+                })
                 .await?;
         }
 
@@ -183,7 +200,6 @@ async fn handler(stream: TcpStream, port: u16) -> color_eyre::Result<()> {
 
 #[tokio::main]
 async fn main() {
-    color_eyre::install().unwrap();
     // Probably not the right way
     spawn(async move {
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
@@ -196,8 +212,8 @@ async fn main() {
     let mut handles = vec![];
     for port in ports {
         handles.push(spawn(listener(CONFIG.bind.addr.clone(), port)));
-    };
+    }
     for h in handles {
         h.await.unwrap();
-    };
+    }
 }

@@ -45,30 +45,30 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn read(path: String) -> color_eyre::Result<Self> {
+    pub fn read(path: String) -> eyre::Result<Self> {
         let file = std::fs::read_to_string(path)?;
         Ok(toml::from_str(&file)?)
     }
 
-    pub fn util_ports_as_vec(&self) -> color_eyre::Result<Vec<u16>> {
-    	let mut v = vec![]; 
-    	let ports = self.bind.ports.clone();
-    	let ports = ports.trim().replace(" ", "");
+    pub fn util_ports_as_vec(&self) -> eyre::Result<Vec<u16>> {
+        let mut v = vec![];
+        let ports = self.bind.ports.clone();
+        let ports = ports.trim().replace(" ", "");
 
-    	for r in ports.split(",") {
-    		if r.contains("-") {
-    			let (start, end) = r.split_once("-").unwrap();
-    			let start = start.parse::<u16>()?;
-    			let end = end.parse::<u16>()?;
+        for r in ports.split(",") {
+            if r.contains("-") {
+                let (start, end) = r.split_once("-").unwrap();
+                let start = start.parse::<u16>()?;
+                let end = end.parse::<u16>()?;
 
-    			v.extend(start..=end);
-    		} else if let Ok(port) = r.parse::<u16>() {
-    			v.push(port);
-    		} else {
-    			color_eyre::eyre::bail!("invalid part");
-    		}
-    	}
+                v.extend(start..=end);
+            } else if let Ok(port) = r.parse::<u16>() {
+                v.push(port);
+            } else {
+                eyre::bail!("invalid part");
+            }
+        }
 
-    	Ok(v)
+        Ok(v)
     }
 }

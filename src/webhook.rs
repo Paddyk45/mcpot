@@ -16,7 +16,7 @@ fn strip(msg: impl ToString) -> String {
         .replace("h\u{200b}ttps://ipinfo.io/", "https://ipinfo.io/") // Probably not a good idea
 }
 
-pub fn send(message: &impl ToString) -> color_eyre::Result<()> {
+pub fn send(message: &impl ToString) -> eyre::Result<()> {
     let cont = strip(message.to_string());
     if CONFIG.webhook.enabled {
         ureq::post(&CONFIG.webhook.url).send_json(json!(
